@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CLV & RFM Analytics Dashboard</title>
+
+  <!-- Chart.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet" />
+
+  <!-- Our CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════
+     LOADING OVERLAY
+═══════════════════════════════════════════════ -->
+<div class="loader-overlay" id="loaderOverlay">
+  <div class="loader-ring"></div>
+  <div class="loader-title">DataLens Analytics</div>
+  <div class="loader-sub">Processing your dataset…</div>
+  <div class="loader-steps">
+    <div class="loader-step" id="ls1"><div class="loader-step-dot"></div> Connecting to Flask API</div>
+    <div class="loader-step" id="ls2"><div class="loader-step-dot"></div> Loading filter options</div>
+    <div class="loader-step" id="ls3"><div class="loader-step-dot"></div> Computing RFM scores</div>
+    <div class="loader-step" id="ls4"><div class="loader-step-dot"></div> Rendering dashboard</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     SIDEBAR
+═══════════════════════════════════════════════ -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">RFM</div>
+    <div class="logo-text">Databysimar <span>CLV &amp; RFM Analytics</span></div>
+  </div>
+
+  <nav class="nav">
+    <div class="nav-label">Pages</div>
+    <button class="nav-item active" onclick="showPage('overview', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="7" height="7" rx="1"/>
+        <rect x="14" y="3" width="7" height="7" rx="1"/>
+        <rect x="3" y="14" width="7" height="7" rx="1"/>
+        <rect x="14" y="14" width="7" height="7" rx="1"/>
+      </svg>
+      Overview
+    </button>
+    <button class="nav-item" onclick="showPage('rfm', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/>
+      </svg>
+      RFM Analysis
+    </button>
+    <button class="nav-item" onclick="showPage('revenue', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
+        <polyline points="16 7 22 7 22 13"/>
+      </svg>
+      Revenue Trends
+    </button>
+    <button class="nav-item" onclick="showPage('customers', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+      Customers
+    </button>
+    <button class="nav-item" onclick="showPage('insights', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      Insights
+    </button>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="badge-bca">BCA Minor Project<br/>CLV &amp; RFM Analysis</div>
+  </div>
+</aside>
+
+<!-- ═══════════════════════════════════════════
+     MAIN AREA
+═══════════════════════════════════════════════ -->
+<div class="main">
+
+  <!-- ── TOPBAR ── -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-title" id="pageTitle">Business Overview</div>
+      <div class="topbar-sub" id="pageSub">Online Retail Dataset · All Time</div>
+    </div>
+    <div class="topbar-right">
+      <!-- Country Filter -->
+      <div class="filter-group">
+        <span class="filter-label">Country:</span>
+        <select class="filter-select" id="countryFilter">
+          <option value="All">All Countries</option>
+        </select>
+      </div>
+      <!-- Month From -->
+      <div class="filter-group">
+        <span class="filter-label">From:</span>
+        <select class="filter-select" id="monthFrom">
+          <option value="">All</option>
+        </select>
+      </div>
+      <!-- Month To -->
+      <div class="filter-group">
+        <span class="filter-label">To:</span>
+        <select class="filter-select" id="monthTo">
+          <option value="">All</option>
+        </select>
+      </div>
+      <!-- Apply Button -->
+      <button class="apply-btn" onclick="applyFilters()">Apply</button>
+
+      <div class="live-indicator">
+        <div class="live-dot"></div>
+        <span class="live-text">Live</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ACTIVE FILTER BAR ── -->
+  <div class="filter-bar hidden" id="filterBar">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+    </svg>
+    Filtered by:
+    <span class="filter-bar-tag" id="filterBarText">—</span>
+  </div>
+
+  <!-- ═══════════════════════════════════════
+       PAGE: OVERVIEW
+  ═══════════════════════════════════════════ -->
+  <div class="content active" id="page-overview">
+
+    <!-- KPI Row -->
+    <div class="kpi-row">
+      <div class="kpi">
+        <div class="kpi-glow" style="background:var(--accent)"></div>
+        <div class="kpi-label">Total Revenue</div>
+        <div class="kpi-value" id="kpiRevenue">—</div>
+        <div class="kpi-change" id="kpiRevenueNote">Loading…</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-glow" style="background:var(--green)"></div>
+        <div class="kpi-label">Total Customers</div>
+        <div class="kpi-value" id="kpiCustomers">—</div>
+        <div class="kpi-change" id="kpiCustomersNote">Loading…</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-glow" style="background:var(--amber)"></div>
+        <div class="kpi-label">Total Orders</div>
+        <div class="kpi-value" id="kpiOrders">—</div>
+        <div class="kpi-change" id="kpiOrdersNote">Loading…</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-glow" style="background:var(--purple)"></div>
+        <div class="kpi-label">Avg Order Value</div>
+        <div class="kpi-value" id="kpiAOV">—</div>
+        <div class="kpi-change" id="kpiAOVNote">Loading…</div>
+      </div>
+    </div>
+
+    <!-- Monthly Revenue + Segment Bars -->
+    <div class="chart-grid">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Monthly Revenue Trend</div>
+          <div class="card-badge" id="overviewMonthBadge">All Months</div>
+        </div>
+        <canvas id="chartRevenueLine"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Customer Segments</div>
+          <div class="card-badge" id="overviewSegBadge">RFM Model</div>
+        </div>
+        <div class="seg-list" id="segBars"></div>
+      </div>
+    </div>
+
+    <!-- Country Bar + Donut + Weekday -->
+    <div class="chart-grid-3">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Revenue by Country</div>
+          <div class="card-badge">Top 10</div>
+        </div>
+        <canvas id="chartCountry"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Segment Distribution</div>
+          <div class="card-badge">Donut</div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:center;height:190px">
+          <canvas id="chartDonut" style="max-height:190px"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Orders by Day of Week</div>
+          <div class="card-badge">Unique Invoices</div>
+        </div>
+        <canvas id="chartWeekday"></canvas>
+      </div>
+    </div>
+  </div><!-- /overview -->
+
+  <!-- ═══════════════════════════════════════
+       PAGE: RFM ANALYSIS
+  ═══════════════════════════════════════════ -->
+  <div class="content" id="page-rfm">
+
+    <!-- Average RFM Metrics -->
+    <div class="rfm-hero">
+      <div class="rfm-metric">
+        <div class="rfm-letter" style="color:var(--rose)">R</div>
+        <div class="rfm-avg" id="rfmAvgR">—</div>
+        <div class="rfm-desc"><strong>Recency</strong><br/>Avg days since last purchase<br/>Lower = more recent = better</div>
+      </div>
+      <div class="rfm-metric">
+        <div class="rfm-letter" style="color:var(--accent)">F</div>
+        <div class="rfm-avg" id="rfmAvgF">—</div>
+        <div class="rfm-desc"><strong>Frequency</strong><br/>Avg unique orders per customer<br/>Higher = more loyal</div>
+      </div>
+      <div class="rfm-metric">
+        <div class="rfm-letter" style="color:var(--green)">M</div>
+        <div class="rfm-avg" id="rfmAvgM">—</div>
+        <div class="rfm-desc"><strong>Monetary</strong><br/>Avg spend per customer (CLV)<br/>Higher = more valuable</div>
+      </div>
+    </div>
+
+    <!-- Segment Bar + Revenue Share Donut -->
+    <div class="chart-grid">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Customer Count per Segment</div>
+          <div class="card-badge" id="rfmSegBadge">All Customers</div>
+        </div>
+        <canvas id="chartSegBar"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Revenue Share by Segment</div>
+          <div class="card-badge green">Estimated</div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:center;height:200px">
+          <canvas id="chartRevShare" style="max-height:200px"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- CLV by Segment Bar Chart — NEW -->
+    <div class="card full-card">
+      <div class="card-header">
+        <div class="card-title">Average CLV (Monetary) per Segment</div>
+        <div class="card-badge green">CLV Analysis</div>
+      </div>
+      <canvas id="chartCLVSegment" style="max-height:240px"></canvas>
+    </div>
+
+    <!-- Top 10 Customers by CLV — NEW -->
+    <div class="card full-card">
+      <div class="card-header">
+        <div class="card-title">🏆 Top 10 Customers by CLV (Monetary Value)</div>
+        <div class="card-badge green">Highest Spenders</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Rank</th>
+            <th>Customer ID</th>
+            <th>Recency (days)</th>
+            <th>Frequency (orders)</th>
+            <th>CLV / Monetary (£)</th>
+            <th>RFM Score</th>
+            <th>Segment</th>
+          </tr></thead>
+          <tbody id="topCustomersTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div><!-- /rfm -->
+
+  <!-- ═══════════════════════════════════════
+       PAGE: REVENUE TRENDS
+  ═══════════════════════════════════════════ -->
+  <div class="content" id="page-revenue">
+
+    <!-- Trend KPIs -->
+    <div class="kpi-row" id="trendKpiRow">
+      <div class="kpi">
+        <div class="kpi-glow" style="background:var(--accent)"></div>
+        <div class="kpi-label">Peak Month</div>
+        <div class="kpi-value" id="trendPeakMonth">—</div>
+        <div class="kpi-change" id="trendPeakNote">Highest revenue period</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-glow" style="background:var(--green)"></div>
+        <div class="kpi-label">Peak Revenue</div>
+        <div class="kpi-value" id="trendPeakRev">—</div>
+        <div class="kpi-change" id="trendPeakRevNote">In peak month</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-glow" style="background:var(--amber)"></div>
+        <div class="kpi-label">Avg Monthly Revenue</div>
+        <div class="kpi-value" id="trendAvgRev">—</div>
+        <div class="kpi-change" id="trendAvgRevNote">Across all months</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-glow" style="background:var(--cyan)"></div>
+        <div class="kpi-label">Best Growth Month</div>
+        <div class="kpi-value" id="trendBestGrowth">—</div>
+        <div class="kpi-change" id="trendBestGrowthNote">MoM % increase</div>
+      </div>
+    </div>
+
+    <!-- Monthly Revenue Bar -->
+    <div class="card full-card">
+      <div class="card-header">
+        <div class="card-title">Monthly Revenue — Bar View</div>
+        <div class="card-badge" id="revBarBadge">All Months</div>
+      </div>
+      <canvas id="chartRevBar" style="max-height:270px"></canvas>
+    </div>
+
+    <!-- Cumulative + MoM Growth -->
+    <div class="chart-grid-2">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Cumulative Revenue</div>
+          <div class="card-badge">Running Total</div>
+        </div>
+        <canvas id="chartCumul"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Month-on-Month Growth %</div>
+          <div class="card-badge amber">% Change</div>
+        </div>
+        <canvas id="chartGrowth"></canvas>
+      </div>
+    </div>
+  </div><!-- /revenue -->
+
+  <!-- ═══════════════════════════════════════
+       PAGE: CUSTOMERS
+  ═══════════════════════════════════════════ -->
+  <div class="content" id="page-customers">
+
+    <div class="chart-grid">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">New Customers per Month</div>
+          <div class="card-badge">First Purchase</div>
+        </div>
+        <canvas id="chartNewCust"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Customers by Country (Top 10)</div>
+          <div class="card-badge">Unique IDs</div>
+        </div>
+        <canvas id="chartCustCountry"></canvas>
+      </div>
+    </div>
+
+    <!-- Segment Health Table -->
+    <div class="card full-card">
+      <div class="card-header">
+        <div class="card-title">Segment Health Overview</div>
+        <div class="card-badge rose">Action Required</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Segment</th>
+            <th>Customers</th>
+            <th>% of Total</th>
+            <th>Avg Recency (days)</th>
+            <th>Avg Frequency</th>
+            <th>Avg CLV (£)</th>
+            <th>Recommended Action</th>
+          </tr></thead>
+          <tbody id="segHealthTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div><!-- /customers -->
+
+  <!-- ═══════════════════════════════════════
+       PAGE: INSIGHTS
+  ═══════════════════════════════════════════ -->
+  <div class="content" id="page-insights">
+    <div style="margin-bottom:18px">
+      <h2 style="font-family:'Manrope',sans-serif;font-size:20px;font-weight:800;margin-bottom:5px">
+        Business Insights &amp; Recommendations
+      </h2>
+      <p style="color:var(--muted);font-size:13px" id="insightsSub">
+        Derived from RFM analysis. Select a filter above to see country-specific insights.
+      </p>
+    </div>
+    <div class="insights-grid" id="insightsGrid"><!-- filled dynamically --></div>
+  </div><!-- /insights -->
+
+</div><!-- /main -->
+
+<!-- Our JS -->
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
