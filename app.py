@@ -64,11 +64,35 @@ def compute_rfm(df):
     ).reset_index()
 
     # ── Score each dimension 1-5 ────────────────────────────
-    rfm["R_Score"] = pd.qcut(rfm["Recency"],   5, labels=[5,4,3,2,1], duplicates="drop").astype(int)
-    rfm["F_Score"] = pd.qcut(rfm["Frequency"].rank(method="first"), 5, labels=[1,2,3,4,5]).astype(int)
-    rfm["M_Score"] = pd.qcut(rfm["Monetary"].rank(method="first"),  5, labels=[1,2,3,4,5]).astype(int)
-    rfm["RFM_Score"] = rfm["R_Score"].astype(str) + rfm["F_Score"].astype(str) + rfm["M_Score"].astype(str)
+    try:
+        rfm["R_Score"] = pd.qcut(
+            rfm["Recency"].rank(method="first"),
+            q=5,
+            labels=[5, 4, 3, 2, 1]
+        ).astype(int)
 
+        rfm["F_Score"] = pd.qcut(
+            rfm["Frequency"].rank(method="first"),
+            q=5,
+            labels=[1, 2, 3, 4, 5]
+        ).astype(int)
+
+        rfm["M_Score"] = pd.qcut(
+            rfm["Monetary"].rank(method="first"),
+            q=5,
+            labels=[1, 2, 3, 4, 5]
+        ).astype(int)
+    except ValueError:
+        # Fallback for very small datasets
+        rfm["R_Score"] = 3
+        rfm["F_Score"] = 3
+        rfm["M_Score"] = 3
+
+    rfm["RFM_Score"] = (
+        rfm["R_Score"].astype(str)
+        + rfm["F_Score"].astype(str)
+        + rfm["M_Score"].astype(str)
+    )
     # ── Segment mapping ─────────────────────────────────────
     def segment(row):
         r, f, m = row["R_Score"], row["F_Score"], row["M_Score"]
